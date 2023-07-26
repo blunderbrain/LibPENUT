@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net35</TargetFrameworks>
+	
+	<Copyright>Copyright (c) 2023, Johan Nyvaller</Copyright>
+	<Description>Object Model for the Common Object File Format and Portable Exectuable Files</Description>
+	<AssemblyTitle>$(Description)</AssemblyTitle>
+	<Version Condition="'$(Version)' == ''">0.0.1</Version>
+  </PropertyGroup>
+
+</Project>
