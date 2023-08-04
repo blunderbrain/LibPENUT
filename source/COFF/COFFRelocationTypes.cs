@@ -921,6 +921,8 @@ namespace LibPENUT
         IMAGE_REL_AMD64_INDIR_BR_SWITCHTABLE_LAST = 0x002F
     }
 
+    #endregion
+
     // TODO:
     // public enum COFFRelocationType_IA64 : ushort
     // public enum COFFRelocationType_M32R : ushort

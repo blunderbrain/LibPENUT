@@ -202,9 +202,14 @@ namespace LibPENUT
                 // Find the first code section and set as BaseOfCode
                 COFFSection firstCodeSection = Sections.FirstOrDefault(s => (s.Header.Characteristics & COFFSectionCharacteristics.IMAGE_SCN_CNT_CODE) != 0);
                 if (firstCodeSection != null)
+                {
                     OptionalHeader.BaseOfCode = firstCodeSection.Header.VirtualAddress;
-                else
-                    OptionalHeader.BaseOfCode = 0;
+                }
+                else if (m_sections.Count > 0)
+                {
+                    // Fallback in case there are no code sections (resource only DLLs and similar). At least Microsofts tools set this to the VA of the first section regardless of section type in this case so lets just stay with that
+                    OptionalHeader.BaseOfCode = m_sections[0].Header.VirtualAddress;
+                }
             }
 
             // currentDataPointer is initialized to the start of the section data (directly after the table of section headers) and advanced below for each data pointer to be updated
@@ -257,7 +262,8 @@ namespace LibPENUT
             } // For each section
 
             // Finally after updating all section headers update the symboltable pointer. currentDataPointer should be positioned after the last section at this point
-            if (Header.NumberOfSymbols > 0)
+            // Note that it's possible to have a string table even if the symbol table is empty and since the symbol table pointer is used to locate the string table we need to keep this updated
+            if (Header.NumberOfSymbols > 0 || m_stringTable.Count > 0)
             {
                 Header.PointerToSymbolTable = currentDataPointer;
             }
@@ -461,6 +467,12 @@ namespace LibPENUT
                         writer.Write((byte)0);
                     }
                 }
+            }
+            else
+            {
+                // Ensure we position at the end of the image for consistency even if there is no symboltable
+                COFFSection lastSection = Sections.Last();
+                outputStream.Seek(imageStreamOffset + lastSection.Header.PointerToRawData + lastSection.Header.SizeOfRawData, SeekOrigin.Begin);
             }
         }
 

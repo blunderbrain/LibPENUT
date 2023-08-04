@@ -45,6 +45,8 @@ namespace LibPENUT
             DOSHeader = new PEDOSHeader();
             DOSStub = new byte[0];
             OptionalHeader = new PEOptionalHeader();
+
+            m_certificates = new List<PEAttributeCertificate>();
             m_importDescriptors = new List<PEImportDescriptor>();
             m_delayLoadimportDescriptors = new List<PEDelayLoadImportDescriptor>();
         }
@@ -86,6 +88,14 @@ namespace LibPENUT
             get { return OptionalHeader as PEOptionalHeader; }
         }
 
+        
+        private List<PEAttributeCertificate> m_certificates;
+
+        public IList<PEAttributeCertificate> Certificates
+        {
+            get { return m_certificates; }
+        }
+
         private List<PEImportDescriptor> m_importDescriptors;
 
         public IEnumerable<PEImportDescriptor> ImportDescriptors
@@ -122,7 +132,7 @@ namespace LibPENUT
             PEOptionalHeader.SizeOfImage = sizeofImage;
 
             // BaseOfData is probably more or less obsolete and is not even present for 64-bit images but setting it is not going to hurt
-            COFFSection firstDataSection = Sections.FirstOrDefault(s => (s.Header.Characteristics & COFFSectionCharacteristics.IMAGE_SCN_CNT_INITIALIZED_DATA) != 0);
+            COFFSection firstDataSection = Sections.FirstOrDefault(s => (s.Header.Characteristics & COFFSectionCharacteristics.IMAGE_SCN_CNT_INITIALIZED_DATA) != 0 && (s.Header.Characteristics & COFFSectionCharacteristics.IMAGE_SCN_CNT_CODE) == 0);
             if (firstDataSection != null)
                 PEOptionalHeader.BaseOfData = firstDataSection.Header.VirtualAddress;
 
@@ -166,49 +176,68 @@ namespace LibPENUT
 
             base.Read(inputStream, imageStreamOffset);
 
-            // TODO: support for remaining data directories - in particular Certificate directory and associated Authenticode data since we currently end up stripping that on save
+            // ********** Start processing data directories **********
+
+            // TODO: support for remaining data directories
+
+            // Read and parse certificate directory i.e. pretty much always an Authenticode signature if the image is signed
+            m_certificates.Clear();
+            if (PEOptionalHeader.DataDirectories.Count > PEDataDirectories.Certificates && PEOptionalHeader.DataDirectories[PEDataDirectories.Certificates].RVA != 0)
+            {
+                PEDataDirectory certificateDirectory = PEOptionalHeader.DataDirectories[PEDataDirectories.Certificates];
+
+                // Guard against malformed files with bogus pointers outside the valid range
+                if (certificateDirectory.RVA + certificateDirectory.TableSize + imageStreamOffset <= inputStream.Length)
+                {
+                    // Seek to first entry
+                    inputStream.Seek(certificateDirectory.RVA + imageStreamOffset, SeekOrigin.Begin);
+                    do
+                    {
+                        // Read past any alignment padding
+                        while ((inputStream.Position % 8) != 0) { inputStream.ReadByte(); }
+
+                        PEAttributeCertificate certificateEntry = new PEAttributeCertificate();
+                        certificateEntry.Read(inputStream);
+                        m_certificates.Add(certificateEntry);
+
+                    } while (inputStream.Position < imageStreamOffset + certificateDirectory.RVA + certificateDirectory.TableSize);
+                }
+            }
 
             // Parse import descriptors
             m_importDescriptors.Clear();
-            if (PEOptionalHeader.DataDirectories.Count >= 2)
+            if (PEOptionalHeader.DataDirectories.Count > PEDataDirectories.Imports && PEOptionalHeader.DataDirectories[PEDataDirectories.Imports].RVA != 0)
             {
-                // Import Descriptor Table is always pointed out by the second datadirectory
-                uint importTableRVA = PEOptionalHeader.DataDirectories[1].RVA;
-                if (importTableRVA != 0)
+                UInt32 importTableRVA = PEOptionalHeader.DataDirectories[PEDataDirectories.Imports].RVA;
+                PEImportDescriptor importDescriptor;
+                // Create and read new descriptors until we find the terminating entry with all members set to zero
+                do
                 {
-                    PEImportDescriptor importDescriptor;
-                    // Create and read new descriptors until we find the terminating entry with all members set to zero
-                    do
+                    importDescriptor = new PEImportDescriptor(this, importTableRVA);
+                    if (importDescriptor.OriginalFirstThunk != 0 && importDescriptor.FirstThunk != 0)
                     {
-                        importDescriptor = new PEImportDescriptor(this, importTableRVA);
-                        if (importDescriptor.OriginalFirstThunk != 0 && importDescriptor.FirstThunk != 0)
-                        {
-                            m_importDescriptors.Add(importDescriptor);
-                        }
+                        m_importDescriptors.Add(importDescriptor);
                         importTableRVA += PEImportDescriptor.Size;
-                    } while (importDescriptor.OriginalFirstThunk != 0 && importDescriptor.FirstThunk != 0);
-                }
+                    }
+                } while (importDescriptor.OriginalFirstThunk != 0 && importDescriptor.FirstThunk != 0);
             }
 
             // Parse delay load import entries
             m_delayLoadimportDescriptors.Clear();
-            if (PEOptionalHeader.DataDirectories.Count >= 14)
+            if (PEOptionalHeader.DataDirectories.Count > PEDataDirectories.DelayImports && PEOptionalHeader.DataDirectories[PEDataDirectories.DelayImports].RVA != 0)
             {
-                uint dealyloadimportTableRVA = ((PEOptionalHeader)OptionalHeader).DataDirectories[13].RVA;
-                if (dealyloadimportTableRVA != 0)
+                UInt32 dealyloadimportTableRVA = PEOptionalHeader.DataDirectories[PEDataDirectories.DelayImports].RVA;
+                PEDelayLoadImportDescriptor importDescriptor;
+                // Create and read new descriptors until we find the terminating entry with all members set to zero
+                do
                 {
-                    PEDelayLoadImportDescriptor importDescriptor;
-                    // Create and read new descriptors until we find the terminating entry with all members set to zero
-                    do
+                    importDescriptor = new PEDelayLoadImportDescriptor(this, dealyloadimportTableRVA);
+                    if (importDescriptor.DelayImportAddressTable != 0 && importDescriptor.DelayImportNameTable != 0)
                     {
-                        importDescriptor = new PEDelayLoadImportDescriptor(this, dealyloadimportTableRVA);
-                        if (importDescriptor.DelayImportAddressTable != 0 && importDescriptor.DelayImportNameTable != 0)
-                        {
-                            m_delayLoadimportDescriptors.Add(importDescriptor);
-                        }
+                        m_delayLoadimportDescriptors.Add(importDescriptor);
                         dealyloadimportTableRVA += PEDelayLoadImportDescriptor.Size;
-                    } while (importDescriptor.DelayImportAddressTable != 0 && importDescriptor.DelayImportNameTable != 0);
-                }
+                    }
+                } while (importDescriptor.DelayImportAddressTable != 0 && importDescriptor.DelayImportNameTable != 0);
             }
 
         }
@@ -226,9 +255,37 @@ namespace LibPENUT
             outputStream.WriteByte((byte)(Signature >> 16));
             outputStream.WriteByte((byte)(Signature >> 8));
             outputStream.WriteByte((byte)Signature);
+
+            // Save position of optional header in case we need to modify it again later on
+            long pointerToOptionalHeader = outputStream.Position + COFFFileHeader.Size;
+
             base.Write(outputStream, imageStreamOffset);
 
-            //TODO: Handle additional data that is not section bound such as Authenticode signatures
+            // Write any certificate data (i.e Authenticode signature)
+            if(m_certificates.Count > 0)
+            {
+                long tableStart = -1;
+                foreach (PEAttributeCertificate cert in m_certificates)
+                {
+                    while ((outputStream.Position % 8) != 0)    // Pad to ensure we end up on an 8 byte boundry
+                        outputStream.WriteByte(0);
+
+                    if (tableStart == -1)
+                        tableStart = outputStream.Position;
+
+                    cert.Write(outputStream);
+                }
+
+                // Update file pointer and size in optional header
+                PEOptionalHeader.DataDirectories[4].RVA = (UInt32)(tableStart - imageStreamOffset);
+                PEOptionalHeader.DataDirectories[4].TableSize = (UInt32)(outputStream.Position - tableStart);
+
+                // Go back and write updated optional header again
+                long currentStreamPos = outputStream.Position;
+                outputStream.Seek(pointerToOptionalHeader, SeekOrigin.Begin);
+                PEOptionalHeader.Write(outputStream);
+                outputStream.Seek(currentStreamPos, SeekOrigin.Begin);
+            }
         }
 
     }
