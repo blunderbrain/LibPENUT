@@ -364,11 +364,11 @@ namespace LibPENUT
             UInt16 result = (Image.Header.Characteristics & COFFImageCharacteristics.IMAGE_FILE_BYTES_REVERSED_HI) == 0 || (Image.Header.Characteristics & COFFImageCharacteristics.IMAGE_FILE_BYTES_REVERSED_LO) != 0 ?
                 // Little Endian
                 (UInt16)(
-                ((UInt16)(RawData[index + 0])) +
+                ((UInt16)(RawData[index + 0])) |
                 ((UInt16)(RawData[index + 1]) << 8) )
                 : // Big Endian (I have yet to see an example of someone using COFF/PE with big endian data but it's in the specification so might as well support it)
                 (UInt16)(
-                ((UInt16)(RawData[index + 1])) +
+                ((UInt16)(RawData[index + 1])) |
                 ((UInt16)(RawData[index + 0]) << 8) )
                 ;
 
@@ -408,14 +408,14 @@ namespace LibPENUT
 
             UInt32 result = (Image.Header.Characteristics & COFFImageCharacteristics.IMAGE_FILE_BYTES_REVERSED_HI) == 0 || (Image.Header.Characteristics & COFFImageCharacteristics.IMAGE_FILE_BYTES_REVERSED_LO) != 0 ?
                 // Little Endian
-                ((UInt32)(RawData[index + 0])) +
-                ((UInt32)(RawData[index + 1]) << 8) +
-                ((UInt32)(RawData[index + 2]) << 16) +
+                ((UInt32)(RawData[index + 0])) |
+                ((UInt32)(RawData[index + 1]) << 8) |
+                ((UInt32)(RawData[index + 2]) << 16) |
                 ((UInt32)(RawData[index + 3]) << 24)
                 : // Big Endian (I have yet to see an example of someone using COFF/PE with big endian data but it's in the specification so might as well support it)
-                ((UInt32)(RawData[index + 3])) +
-                ((UInt32)(RawData[index + 2]) << 8) +
-                ((UInt32)(RawData[index + 1]) << 16) +
+                ((UInt32)(RawData[index + 3])) |
+                ((UInt32)(RawData[index + 2]) << 8) |
+                ((UInt32)(RawData[index + 1]) << 16) |
                 ((UInt32)(RawData[index + 0]) << 24)
                 ;
 
@@ -452,22 +452,22 @@ namespace LibPENUT
 
             UInt64 result = (Image.Header.Characteristics & COFFImageCharacteristics.IMAGE_FILE_BYTES_REVERSED_HI) == 0 || (Image.Header.Characteristics & COFFImageCharacteristics.IMAGE_FILE_BYTES_REVERSED_LO) != 0 ?
                 // Little Endian
-                ((UInt64)(RawData[index + 0])) +
-                ((UInt64)(RawData[index + 1]) << 8) +
-                ((UInt64)(RawData[index + 2]) << 16) +
-                ((UInt64)(RawData[index + 3]) << 24) +
-                ((UInt64)(RawData[index + 4]) << 32) +
-                ((UInt64)(RawData[index + 5]) << 40) +
-                ((UInt64)(RawData[index + 6]) << 48) +
+                ((UInt64)(RawData[index + 0])) |
+                ((UInt64)(RawData[index + 1]) << 8)  |
+                ((UInt64)(RawData[index + 2]) << 16) |
+                ((UInt64)(RawData[index + 3]) << 24) |
+                ((UInt64)(RawData[index + 4]) << 32) |
+                ((UInt64)(RawData[index + 5]) << 40) |
+                ((UInt64)(RawData[index + 6]) << 48) |
                 ((UInt64)(RawData[index + 7]) << 56)
                 : // Big Endian (I have yet to see an example of someone using COFF/PE with big endian data but it's in the specification so might as well support it)
-                ((UInt64)(RawData[index + 7])) +
-                ((UInt64)(RawData[index + 6]) << 8) +
-                ((UInt64)(RawData[index + 5]) << 16) +
-                ((UInt64)(RawData[index + 4]) << 24) +
-                ((UInt64)(RawData[index + 3]) << 32) +
-                ((UInt64)(RawData[index + 2]) << 40) +
-                ((UInt64)(RawData[index + 1]) << 48) +
+                ((UInt64)(RawData[index + 7])) |
+                ((UInt64)(RawData[index + 6]) << 8)  |
+                ((UInt64)(RawData[index + 5]) << 16) |
+                ((UInt64)(RawData[index + 4]) << 24) |
+                ((UInt64)(RawData[index + 3]) << 32) |
+                ((UInt64)(RawData[index + 2]) << 40) |
+                ((UInt64)(RawData[index + 1]) << 48) |
                 ((UInt64)(RawData[index + 0]) << 56)
                 ;
 

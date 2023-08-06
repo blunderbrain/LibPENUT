@@ -38,6 +38,9 @@ namespace LibPENUT
     public class PEAttributeCertificate
     {
 
+        /// <summary>
+        /// Construct a new empty PEAttributeCertificate entry
+        /// </summary>
         public PEAttributeCertificate()
         {
             CertificateData = new byte[0];
@@ -45,12 +48,23 @@ namespace LibPENUT
             CertificateType = PEAttributeCertificateType.WIN_CERT_TYPE_PKCS_SIGNED_DATA;
         }
 
+        /// <summary>
+        /// Read an entry from the specified stream
+        /// </summary>
         public void Read(Stream inputStream)
         {
             using(PENUTBinaryReader reader = new PENUTBinaryReader(inputStream, System.Text.Encoding.ASCII, true))
             {
                 uint length = reader.ReadUInt32();
-                CertificateData = new byte[length - 8];
+                if (length >= 8)
+                {
+                    CertificateData = new byte[length - 8];
+                }
+                else
+                {
+                    // Something is wrong with this entry, do the best we can to not blow up the parser
+                    CertificateData = new byte[0];
+                }
 
                 Revision = reader.ReadUInt16();
                 CertificateType = (PEAttributeCertificateType)reader.ReadUInt16();
@@ -60,11 +74,14 @@ namespace LibPENUT
 
         }
 
+        /// <summary>
+        /// Write this entry to the specified stream
+        /// </summary>
         public void Write(Stream outputStream)
         {
             using (PENUTBinaryWriter writer = new PENUTBinaryWriter(outputStream, System.Text.Encoding.ASCII, true))
             {
-                writer.Write(Length);
+                writer.Write(Size);
                 writer.Write(Revision);
                 writer.Write((UInt16)CertificateType);
                 writer.Write(CertificateData);
@@ -72,11 +89,17 @@ namespace LibPENUT
 
         }
 
-        public UInt32 Length
+        /// <summary>
+        /// Size in bytes of this certificate entry. This includes the size of the Size field itself as well as the Revision and CertiFicateType fields
+        /// </summary>
+        public UInt32 Size
         {
             get { return (UInt32)(8 + CertificateData.Length); }
         }
 
+        /// <summary>
+        /// Data for this certificate entry. The type of data depends on the Revision and CertificateType fields
+        /// </summary>
         public byte[] CertificateData
         {
             get;set;
@@ -91,6 +114,9 @@ namespace LibPENUT
             get;set;
         }
 
+        /// <summary>
+        /// Type of this certificate entry
+        /// </summary>
         public PEAttributeCertificateType CertificateType
         {
             get;set;
