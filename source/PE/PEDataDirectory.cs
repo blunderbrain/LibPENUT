@@ -32,6 +32,28 @@ using System;
 namespace LibPENUT
 {
     /// <summary>
+    /// Constants describing the index of each of the well known Data Directory tables in the PE optional header
+    /// </summary>
+    public struct PEDataDirectories
+    {
+        public const int Exports = 0;
+        public const int Imports = 1;
+        public const int Resources = 2;
+        public const int Exceptions = 3;
+        public const int Certificates = 4;
+        public const int BaseRelocations = 5;
+        public const int Debug = 6;
+        public const int Architecture = 7;
+        public const int GlobalPointers = 8;
+        public const int TLS = 9;
+        public const int LoadConfig = 10;
+        public const int BoundImports = 11;
+        public const int ImportAddresses = 12;
+        public const int DelayImports = 13;
+        public const int ClrRuntimeHeader = 14;
+    }
+
+    /// <summary>
     /// Represents a data directory in a PE optional header
     /// A data directory contains information about tables loaded from the image into memory when the image is loaded
     /// </summary>

@@ -43,6 +43,7 @@ namespace LibPENUT
         #region Private Members
 
         private bool m_layoutSuspended;
+        private COFFSection m_symtabSection;
 
         private COFFFileHeader m_header;
         private List<COFFSection> m_sections;
@@ -138,6 +139,7 @@ namespace LibPENUT
             m_symbols = new List<COFFSymbol>();
             m_stringTable = new SortedList<UInt32, string>();
             m_layoutSuspended = false;
+            m_symtabSection = null;
         }
 
         /// <summary>
@@ -202,9 +204,14 @@ namespace LibPENUT
                 // Find the first code section and set as BaseOfCode
                 COFFSection firstCodeSection = Sections.FirstOrDefault(s => (s.Header.Characteristics & COFFSectionCharacteristics.IMAGE_SCN_CNT_CODE) != 0);
                 if (firstCodeSection != null)
+                {
                     OptionalHeader.BaseOfCode = firstCodeSection.Header.VirtualAddress;
-                else
-                    OptionalHeader.BaseOfCode = 0;
+                }
+                else if (m_sections.Count > 0)
+                {
+                    // Fallback in case there are no code sections (resource only DLLs and similar). At least Microsofts tools set this to the VA of the first section regardless of section type in this case so lets just stay with that
+                    OptionalHeader.BaseOfCode = m_sections[0].Header.VirtualAddress;
+                }
             }
 
             // currentDataPointer is initialized to the start of the section data (directly after the table of section headers) and advanced below for each data pointer to be updated
@@ -257,7 +264,13 @@ namespace LibPENUT
             } // For each section
 
             // Finally after updating all section headers update the symboltable pointer. currentDataPointer should be positioned after the last section at this point
-            if (Header.NumberOfSymbols > 0)
+            // Note that it's possible to have a string table even if the symbol table is empty and since the symbol table pointer is used to locate the string table we need to keep this updated
+            if (m_symtabSection != null && Sections.Contains(m_symtabSection))
+            {
+                // Image is using the ELF convention with the symboltable in a .symtab section
+                Header.PointerToSymbolTable = m_symtabSection.Header.PointerToRawData;
+            }
+            else if (Header.NumberOfSymbols > 0 || m_stringTable.Count > 0)
             {
                 Header.PointerToSymbolTable = currentDataPointer;
             }
@@ -359,6 +372,11 @@ namespace LibPENUT
             // Seek to start of symboltable (if present)
             if (Header.PointerToSymbolTable != 0)
             {
+                // The GO compiler (and maybe other tools?) uses the ELF convention of putting the symbol table (and string table) in a .symtab section
+                // instead of the COFF standard of having them as a datastructure and we need to remember that when updating our layout.
+                // TODO: Look at if we can support symbol table editing in this scenario or if that should be blocked
+                m_symtabSection = Sections.FirstOrDefault(s => s.Header.PointerToRawData == Header.PointerToSymbolTable);
+
                 inputStream.Seek(imageStreamOffset + Header.PointerToSymbolTable, SeekOrigin.Begin);
 
                 // Read symbol table
@@ -400,6 +418,18 @@ namespace LibPENUT
                         }
                     }
                 }
+
+                // If symbol and string table is contained in a .symtab section we need to ensure we explicitly position at the end of the section before exiting (string table may not extend all the way to the end)
+                if (m_symtabSection != null)
+                {
+                    inputStream.Seek(imageStreamOffset + m_symtabSection.Header.PointerToRawData + m_symtabSection.Header.SizeOfRawData, SeekOrigin.Begin);
+                }
+            }
+            else
+            {
+                // Ensure we always position at the end of the last sectiondata before returning so derived classes can keep reading from there
+                COFFSection lastSection = Sections.Last();
+                inputStream.Seek(imageStreamOffset + lastSection.Header.PointerToRawData + lastSection.Header.SizeOfRawData, SeekOrigin.Begin);
             }
         }
 
@@ -436,8 +466,8 @@ namespace LibPENUT
             foreach (COFFSection Section in m_sections)
                 Section.Write(outputStream, imageStreamOffset);
 
-            // Write symboltable
-            if (Header.PointerToSymbolTable != 0)
+            // Write symboltable if there is one and if it's not contained in a .symtab section (ELF style) in which case we have already written it
+            if (Header.PointerToSymbolTable != 0 && (m_symtabSection == null || !Sections.Contains(m_symtabSection)) )
             {
                 outputStream.Seek(Header.PointerToSymbolTable + imageStreamOffset, SeekOrigin.Begin);
                 foreach (COFFSymbol Symbol in m_symbols)
@@ -461,6 +491,12 @@ namespace LibPENUT
                         writer.Write((byte)0);
                     }
                 }
+            }
+            else
+            {
+                // Ensure we position at the end of the image for consistency even if there is no symbol/string table
+                COFFSection lastSection = Sections.Last();
+                outputStream.Seek(imageStreamOffset + lastSection.Header.PointerToRawData + lastSection.Header.SizeOfRawData, SeekOrigin.Begin);
             }
         }
 

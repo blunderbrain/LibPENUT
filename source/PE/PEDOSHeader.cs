@@ -283,6 +283,13 @@ namespace LibPENUT
             {
                 UInt16 Tmp = reader.ReadUInt16();
                 e_magic = (MagicNumbers)((Tmp >> 8) | (Tmp << 8));
+
+                // First sanity check that we are dealing with a PE file
+                if (!(e_magic == MagicNumbers.IMAGE_DOS_SIGNATURE || e_magic == MagicNumbers.IMAGE_OS2_SIGNATURE || e_magic == MagicNumbers.IMAGE_OS2_SIGNATURE_LE) )
+                {
+                    throw new BadImageFormatException(string.Format("Error: Unknown image signature 0x{0:X} in DOS header. Expected 0x4D5A (MZ), 0x4E45 (NE) or 0x4C45 (LE)", e_magic));
+                }
+
                 e_cblp = reader.ReadUInt16();
                 e_cp = reader.ReadUInt16();
                 e_crlc = reader.ReadUInt16();

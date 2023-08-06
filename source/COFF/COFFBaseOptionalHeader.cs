@@ -190,6 +190,7 @@ namespace LibPENUT
         /// <param name="outputStream">The Stream object to write to</param>
         public override void Write(Stream outputStream)
         {
+            UpdateRawData();
             outputStream.Write(RawData, 0, RawData.Length);
         }
 
