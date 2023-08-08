@@ -52,7 +52,7 @@ namespace LibPENUT
             /// Ignore any extra data at the end of the image that is not referenced by any header or other datastructure.
             /// When this flag is set the parser will stop reading after the last section (or certificate table if present) even if there are more data left in the stream
             /// </summary>
-            StripExtraPayload = 0x2
+            StripOverlay = 0x2
         }
         
         public PEImage() : base()
@@ -60,7 +60,9 @@ namespace LibPENUT
             DOSHeader = new PEDOSHeader();
             DOSStub = new byte[0];
             OptionalHeader = new PEOptionalHeader();
-            ExtraPayload = new byte[0];
+            Overlay = new byte[0];
+
+            ExportsDirectory = new PEExportDirectory();
 
             m_certificates = new List<PEAttributeCertificate>();
             m_importDescriptors = new List<PEImportDescriptor>();
@@ -107,11 +109,19 @@ namespace LibPENUT
         /// <summary>
         /// Any extra data present at the end of the image that is not part of any section or referenced by other PE data structures
         /// </summary>
-        public byte[] ExtraPayload
+        public byte[] Overlay
         {
             get;set;
         }
-        
+
+        /// <summary>
+        /// A PEExportDirectory object that describes exported symbols from the image (if any)
+        /// </summary>
+        public PEExportDirectory ExportsDirectory
+        {
+            get; private set;
+        }
+
         private List<PEAttributeCertificate> m_certificates;
 
         public IList<PEAttributeCertificate> Certificates
@@ -246,6 +256,8 @@ namespace LibPENUT
 
             // TODO: support for remaining data directories
 
+            // ********** Certificates Directory **********
+
             // Read and parse certificate directory i.e. pretty much always an Authenticode signature if the image is signed
             m_certificates.Clear();
             if (PEOptionalHeader.DataDirectories.Count > PEDataDirectories.Certificates &&
@@ -254,14 +266,14 @@ namespace LibPENUT
             {
                 PEDataDirectory certificateDirectory = PEOptionalHeader.DataDirectories[PEDataDirectories.Certificates];
 
-                // Check for and handle extra payload data between last section and certificate table
-                long payLoadSize = certificateDirectory.RVA + imageStreamOffset - inputStream.Position;
-                if (payLoadSize > 0 && (readOptions & ReadOptions.StripExtraPayload) == 0)
+                // Check for and handle extra data between last section and certificate table
+                long overlaySize = certificateDirectory.RVA + imageStreamOffset - inputStream.Position;
+                if (overlaySize > 0 && (readOptions & ReadOptions.StripOverlay) == 0)
                 {
-                    ExtraPayload = new byte[payLoadSize];
-                    inputStream.Read(ExtraPayload, 0, ExtraPayload.Length);
-                    if (payLoadSize < 8 && ExtraPayload.All(x => x == 0))  // Less than 8 bytes that are all zero - this is almost certainly just padding for the certificate table so lets ignore it
-                        ExtraPayload = new byte[0];
+                    Overlay = new byte[overlaySize];
+                    inputStream.Read(Overlay, 0, Overlay.Length);
+                    if (overlaySize < 8 && Overlay.All(x => x == 0))  // Less than 8 bytes that are all zero - this is almost certainly just padding for the certificate table so lets ignore it
+                        Overlay = new byte[0];
                 }
 
                 // Seek to first certificate entry
@@ -277,15 +289,21 @@ namespace LibPENUT
 
                 } while (inputStream.Position < imageStreamOffset + certificateDirectory.RVA + certificateDirectory.TableSize);
             }
-            else if (inputStream.Position < inputStream.Length - 1 && (readOptions & ReadOptions.StripExtraPayload) == 0)
+            else if (inputStream.Position < inputStream.Length - 1 && (readOptions & ReadOptions.StripOverlay) == 0)
             {
-                // No certificates table and there is still data in the stream, populate ExtraPayload unless explicitly disabled
-                long payLoadSize = inputStream.Length - inputStream.Position;
-                ExtraPayload = new byte[payLoadSize];
-                inputStream.Read(ExtraPayload, 0, ExtraPayload.Length);
+                // No certificates table and there is still data in the stream, populate Overlay unless explicitly disabled
+                long overlaySize = inputStream.Length - inputStream.Position;
+                Overlay = new byte[overlaySize];
+                inputStream.Read(Overlay, 0, Overlay.Length);
             }
 
-            // Parse import descriptors
+            // ********** Exports Directory **********
+            if (PEOptionalHeader.DataDirectories.Count > PEDataDirectories.Exports && PEOptionalHeader.DataDirectories[PEDataDirectories.Exports].RVA != 0)
+            {
+                ExportsDirectory = new PEExportDirectory(this, PEOptionalHeader.DataDirectories[PEDataDirectories.Exports].RVA);
+            }
+
+            // ********** Import Directory **********
             m_importDescriptors.Clear();
             if (PEOptionalHeader.DataDirectories.Count > PEDataDirectories.Imports && PEOptionalHeader.DataDirectories[PEDataDirectories.Imports].RVA != 0)
             {
@@ -303,7 +321,8 @@ namespace LibPENUT
                 } while (importDescriptor.OriginalFirstThunk != 0 && importDescriptor.FirstThunk != 0);
             }
 
-            // Parse delay load import entries
+            // ********** Delay Import Directory **********
+
             m_delayLoadimportDescriptors.Clear();
             if (PEOptionalHeader.DataDirectories.Count > PEDataDirectories.DelayImports && PEOptionalHeader.DataDirectories[PEDataDirectories.DelayImports].RVA != 0)
             {
@@ -342,10 +361,10 @@ namespace LibPENUT
 
             base.Write(outputStream, imageStreamOffset);
 
-            // Write any extra payload data
-            if (ExtraPayload.Length > 0)
+            // Write any extra overlay data
+            if (Overlay.Length > 0)
             {
-                outputStream.Write(ExtraPayload,0, ExtraPayload.Length);
+                outputStream.Write(Overlay,0, Overlay.Length);
             }
 
             // Write any certificate data (i.e Authenticode signature)

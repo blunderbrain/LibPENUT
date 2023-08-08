@@ -106,7 +106,7 @@ namespace LibPENUT
                             if ( (importEntry & 0x8000000000000000) != 0)
                             {
                                 // MSB bit is set, import is by ordinal and remaining bits is the ordinal nr
-                                m_imports.Add(new PEImportedSymbol(0, (importEntry & 0x7FFFFFFFFFFFFFFF).ToString(), (Int64)(importEntry & 0x7FFFFFFFFFFFFFFF)));
+                                m_imports.Add(new PEImportedSymbol(0, (importEntry & 0x7FFFFFFFFFFFFFFF).ToString(), (Int16)(importEntry & 0x7FFFFFFFFFFFFFFF)));
                             }
                             else
                             {
@@ -130,7 +130,7 @@ namespace LibPENUT
                             if ((importEntry & 0x80000000) != 0)
                             {
                                 // MSB bit is set, import is by ordinal and remaining bits is the ordinal nr
-                                m_imports.Add(new PEImportedSymbol(0, (importEntry & 0x7FFFFFFF).ToString(), importEntry & 0x7FFFFFFF));
+                                m_imports.Add(new PEImportedSymbol(0, (importEntry & 0x7FFFFFFF).ToString(), (Int16)(importEntry & 0x7FFFFFFF)));
                             }
                             else
                             {
