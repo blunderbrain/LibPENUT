@@ -32,38 +32,49 @@ using System;
 namespace LibPENUT
 {
     /// <summary>
-    /// Represents an entry in the Hint/Name table describing a symbol from an imported or delay loaded dll
+    /// Represents an exported symbol from images export directory
     /// </summary>
-    public class PEImportedSymbol
+    public class PEExportedSymbol
     {
 
-        public PEImportedSymbol()
+        /// <summary>
+        /// Constructs an empty symbol reference
+        /// </summary>
+        public PEExportedSymbol()
         {
-            Hint = 0;
             Name = string.Empty;
-        }
-
-        public PEImportedSymbol(UInt16 hint, string name, Int16 ordinal)
-        {
-            Hint = hint;
-            Name = name;
-            Ordinal = ordinal;
-        }
-
-        public PEImportedSymbol(UInt16 hint, string name) : this(hint, name, -1)
-        {
+            ReferenceName = string.Empty;
+            Ordinal = 0;
+            IsForwardReference = false;
         }
 
         /// <summary>
-        /// Index into the Export Name Pointer Table for the imported DLL. If the symbol is imported by ordinal this is set to 0
+        /// If IsForwardReference is set to false this is the actual relative virtual address of the exported symbol. Otherwise it's a pointer to a forward reference string
         /// </summary>
-        public UInt16 Hint
+        public UInt32 RVA
         {
             get;set;
         }
 
         /// <summary>
-        /// Name of the imported symbol. If the symbol is imported by ordinal this is set to the string representation of the ordinal number
+        /// If IsForwardReference is set to true the symbol is not located within this image and ReferenceName contains a string that describes the actual location and name of the symbol
+        /// The RVA field in this case does not point to an actual symbol address but rather to the string contained in ReferenceName
+        /// </summary>
+        public bool IsForwardReference
+        {
+            get;set;
+        }
+
+        /// <summary>
+        /// If IsForwardReference is set to true this contains the forward reference name of the symbol which is a combination of the DLL name containing the actual symbol and the name of the symbol within that DLL
+        /// </summary>
+        public string ReferenceName
+        {
+            get; set;
+        }
+
+        /// <summary>
+        /// Name of the exported symbol
         /// </summary>
         public string Name
         {
@@ -71,7 +82,7 @@ namespace LibPENUT
         }
 
         /// <summary>
-        /// Ordinal of the imported symbol. If the symbol is imported by name this is set to -1
+        /// Ordinal of the exported symbol
         /// </summary>
         public Int16 Ordinal
         {
