@@ -152,8 +152,7 @@ namespace LibPENUT
             uint sizeOfHeaders = Convert.ToUInt32(PEDOSHeader.Size + DOSStub.Length + COFFFileHeader.Size + OptionalHeader.Size + COFFSectionHeader.Size * Header.NrOfSections);
 
             // Pad for FileAlignment
-            if (sizeOfHeaders % PEOptionalHeader.FileAlignment != 0)
-                sizeOfHeaders = sizeOfHeaders - (sizeOfHeaders % PEOptionalHeader.FileAlignment) + PEOptionalHeader.FileAlignment;
+            sizeOfHeaders = sizeOfHeaders.AlignTo(PEOptionalHeader.FileAlignment);
 
             // The nominal size here with a file alignment of 0x200 will be 0x400 but some tools set this to 0x600 for some reason and we don't want to cause unnecessary differenses with the orignal image
             if (sizeOfHeaders > PEOptionalHeader.SizeOfHeaders)
@@ -161,10 +160,7 @@ namespace LibPENUT
 
             // Compute size of the loaded image by taking the highest section RVA and pad for SectionAlignment
             UInt32 sizeofImage = Sections.Last().Header.VirtualAddress + Sections.Last().Header.VirtualSize;
-            if (sizeofImage % PEOptionalHeader.SectionAlignment != 0)
-                sizeofImage = sizeofImage - (sizeofImage % PEOptionalHeader.SectionAlignment) + PEOptionalHeader.SectionAlignment;
-
-            PEOptionalHeader.SizeOfImage = sizeofImage;
+            PEOptionalHeader.SizeOfImage = sizeofImage.AlignTo(PEOptionalHeader.SectionAlignment);
 
             // BaseOfData is probably more or less obsolete and is not present for 64-bit images.
             // Many files do not set this in the 32-bit case either so filling it in here is just going to create unnecessary differences between input and output files
@@ -185,8 +181,8 @@ namespace LibPENUT
             // The most common way seems to be to sum up the virtual sizes for the data sections, after adjusting them for FileAlignment but some tools seem to just sum up the RawData sizes instead which can yield slightly different results
             // Again we leave these for the end user to mess with instead of trying to guess what the original toolchain did
 
-            // PEOptionalHeader.SizeOfInitializedData = (UInt32)Sections.Where(s => (s.Header.Characteristics & COFFSectionCharacteristics.IMAGE_SCN_CNT_INITIALIZED_DATA) != 0).Sum(s => (s.Header.VirtualSize % optionalHeader.FileAlignment) == 0 ? s.Header.VirtualSize : s.Header.VirtualSize - (s.Header.VirtualSize % optionalHeader.FileAlignment) + optionalHeader.FileAlignment);
-            // PEOptionalHeader.SizeOfUninitializedData = (UInt32)Sections.Where(s => (s.Header.Characteristics & COFFSectionCharacteristics.IMAGE_SCN_CNT_UNINITIALIZED_DATA) != 0).Sum(s => (s.Header.VirtualSize % optionalHeader.FileAlignment) == 0 ? s.Header.VirtualSize : s.Header.VirtualSize - (s.Header.VirtualSize % optionalHeader.FileAlignment) + optionalHeader.FileAlignment);
+            // PEOptionalHeader.SizeOfInitializedData = (UInt32)Sections.Where(s => (s.Header.Characteristics & COFFSectionCharacteristics.IMAGE_SCN_CNT_INITIALIZED_DATA) != 0).Sum(s => s.Header.VirtualSize.AlignTo(PEOptionalHeader.FileAlignment));
+            // PEOptionalHeader.SizeOfUninitializedData = (UInt32)Sections.Where(s => (s.Header.Characteristics & COFFSectionCharacteristics.IMAGE_SCN_CNT_UNINITIALIZED_DATA) != 0).Sum(s => s.Header.VirtualSize.AlignTo(PEOptionalHeader.FileAlignment));
 
             base.UpdateLayout(PEOptionalHeader.FileAlignment, PEOptionalHeader.SizeOfHeaders);
         }

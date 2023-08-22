@@ -178,7 +178,7 @@ namespace LibPENUT
             COFFSection lastSection = image.Sections.Last();
             UInt32 rva = lastSection.Header.VirtualAddress + lastSection.Header.VirtualSize;
 
-            rva = rva - (rva % image.PEOptionalHeader.SectionAlignment) + image.PEOptionalHeader.SectionAlignment;
+            rva = rva.AlignTo(image.PEOptionalHeader.SectionAlignment);
 
             return CreateSection(image, imageName, rva, symbols, ordinalBase);
         }
@@ -211,9 +211,7 @@ namespace LibPENUT
                 );
 
             // Raw data size padded to file alignment
-            edata.Header.SizeOfRawData = edata.Header.VirtualSize % image.PEOptionalHeader.FileAlignment == 0 ?
-                edata.Header.VirtualSize :
-                edata.Header.VirtualSize - (edata.Header.VirtualSize % image.PEOptionalHeader.FileAlignment) + image.PEOptionalHeader.FileAlignment;
+            edata.Header.SizeOfRawData = edata.Header.VirtualSize.AlignTo(image.PEOptionalHeader.FileAlignment);
 
             edata.RawData = new byte[edata.Header.SizeOfRawData];
 
@@ -221,7 +219,7 @@ namespace LibPENUT
             {
                 // Write header data
                 writer.Write((UInt32)0);    // Flags
-                writer.Write((UInt32)((DateTime.UtcNow.Ticks - 621355968000000000) / 10000000 )); //Timestamp
+                writer.Write((UInt32)DateTime.UtcNow.ToUnixTime()); //Timestamp
                 writer.Write((UInt32)0);    // Major and Minor version
                 writer.Write((UInt32)(edata.Header.VirtualAddress + PEExportDirectory.Size + (nrOfSymbols * 8) + (nrOfSymbols * 2)));    // NameRVA located after the 3 tables
                 writer.Write((UInt32)ordinalBase);    // OrdinalBase
@@ -322,7 +320,7 @@ namespace LibPENUT
             set
             {
                 m_timeDateStamp = value;
-                m_unixTimeDateStamp = (m_timeDateStamp.ToUniversalTime().Ticks - 621355968000000000) / 10000000;
+                m_unixTimeDateStamp = m_timeDateStamp.ToUniversalTime().ToUnixTime();
             }
         }
 
@@ -336,7 +334,7 @@ namespace LibPENUT
             set
             {
                 m_unixTimeDateStamp = value;
-                m_timeDateStamp = new DateTime(value * 10000000 + 621355968000000000).ToLocalTime();
+                m_timeDateStamp = DateTime.Now.FromUnixTime(value).ToLocalTime();
             }
         }
 
