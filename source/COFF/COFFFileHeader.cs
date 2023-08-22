@@ -63,7 +63,7 @@ namespace LibPENUT
         public DateTime TimeDateStamp
         {
             get { return m_timeDateStamp; }
-            set { m_timeDateStamp = value; m_unixTimeDateStamp = (m_timeDateStamp.ToUniversalTime().Ticks - 621355968000000000) / 10000000; }
+            set { m_timeDateStamp = value; m_unixTimeDateStamp = m_timeDateStamp.ToUniversalTime().ToUnixTime(); }
         }
         /// <summary>
         /// Time and date the image was created expressed as seconds since the UNIX epoch 1/1 00:00 1970 
@@ -149,15 +149,13 @@ namespace LibPENUT
             {
                 MachineType = (COFFMachineType)reader.ReadUInt16();
                 NrOfSections = reader.ReadUInt16();
-                Int64 ticks = reader.ReadUInt32();
+                long timestamp = reader.ReadUInt32();
+                TimeDateStamp = DateTime.Now.FromUnixTime(timestamp).ToLocalTime();
                 PointerToSymbolTable = reader.ReadUInt32();
                 NumberOfSymbols = reader.ReadUInt32();
                 SizeOfOptionalHeader = reader.ReadUInt16();
                 Characteristics = (COFFImageCharacteristics)reader.ReadUInt16();
 
-                ticks *= 10000000;      // Convert from seconds to ticks
-                ticks += 621355968000000000;    // Add nr of ticks from 1/1 00:00 0001 to 1/1 00:00 1970
-                TimeDateStamp = new DateTime(ticks).ToLocalTime();
             }
         }
 

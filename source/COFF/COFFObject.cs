@@ -65,11 +65,8 @@ namespace LibPENUT
         }
 
         /// <summary>
-        /// A ICOFFOptionalHeader object containing additional header data.
+        /// An object derived from the abstract baseclass COFFOptionalHeader containing additional header data.
         /// </summary>
-        /// <remarks>
-        /// Users of this class may assign their own implementation of this interface to support platform specific optional headers. In this case a new optional header object should be assigned before calling Read()
-        /// </remarks>
         /// <see cref="COFFOptionalHeader"/>
         public COFFOptionalHeader OptionalHeader
         {
@@ -224,10 +221,7 @@ namespace LibPENUT
                 if (section.Header.SizeOfRawData > 0 && (section.Header.Characteristics & COFFSectionCharacteristics.IMAGE_SCN_CNT_UNINITIALIZED_DATA) == 0)
                 {
                     // Adjust start of section data according to specified file alignment
-                    if (sectionFileAlignment > 0 && (currentDataPointer % sectionFileAlignment != 0))
-                    {
-                        currentDataPointer = currentDataPointer - (currentDataPointer % sectionFileAlignment) + sectionFileAlignment;
-                    }
+                    currentDataPointer = currentDataPointer.AlignTo(sectionFileAlignment);
 
                     section.Header.PointerToRawData = currentDataPointer;
                     // Advance data pointer past the raw section data
@@ -245,10 +239,10 @@ namespace LibPENUT
                     // Advance data pointer past the relocation entries
                     currentDataPointer += (section.Header.NumberOfRelocations * COFFRelocation.Size);
                 }
-                /* Import libraries with .idata sections that has a relocation pointer but no relocations have been seen in the wild. It's unknown if this is a bogus pointer or has some purpose but lets leave it alone in case we come across one
                 else
-                    Section.Header.PointerToRelocations = 0;
-                */
+                {
+                    section.Header.PointerToRelocations = 0;
+                }
 
                 // Adjust linenumber pointer
                 if (section.Header.NumberOfLineNumbers > 0)
