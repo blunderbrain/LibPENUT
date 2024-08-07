@@ -400,3 +400,4 @@ FodyWeavers.xsd
 
 # Exceptions for binary testdata
 !test/TestData/**/*.[Oo]bj
+/test/TestData/CL_v19/TestData2_Release_x64_OddSize.exe

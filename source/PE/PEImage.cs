@@ -285,7 +285,7 @@ namespace LibPENUT
 
                 } while (inputStream.Position < imageStreamOffset + certificateDirectory.RVA + certificateDirectory.TableSize);
             }
-            else if (inputStream.Position < inputStream.Length - 1 && (readOptions & ReadOptions.StripOverlay) == 0)
+            else if (inputStream.Position < inputStream.Length && (readOptions & ReadOptions.StripOverlay) == 0)
             {
                 // No certificates table and there is still data in the stream, populate Overlay unless explicitly disabled
                 long overlaySize = inputStream.Length - inputStream.Position;
@@ -388,6 +388,79 @@ namespace LibPENUT
                 PEOptionalHeader.Write(outputStream);
                 outputStream.Seek(currentStreamPos, SeekOrigin.Begin);
             }
+        }
+
+        /// <summary>
+        /// Calcuclates the PE image checksum for the CheckSum field in the optional header in the same manner as the CheckSumMappedFile() API from the ImageHlp.dll
+        /// </summary>
+        public UInt32 CalculateCheckSum()
+        {
+            // We're using a temporary file here to first write out the complete image and then calculate the checksum from that.
+            // Altough it might be slower, a file is more convenient than for example a MemoryStream here since we don't have to precalculate the allocation size or worry about memory consumption
+            string tmpFile = Path.GetTempFileName();
+            UInt64 checkSum = 0;
+
+            using (FileStream fs = new FileStream(tmpFile, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+            {
+                // Write out the image and seek back to the beginning
+                Write(fs);
+                fs.Position = 0;
+
+                // Determine the offset to the checksum field in the optional header
+                long pointerToCheckSum = PEDOSHeader.Size + DOSStub.Length + 4 + COFFFileHeader.Size + 64;
+
+                byte[] readBuffer = new byte[4];
+                UInt32 currentDWORD = 0;
+                long fileSize = fs.Length;
+
+                while (fs.Position < fileSize)
+                {
+                    // The checksum field in the optional header should not be part of the checksum for obvious reasons so skip it
+                    if (fs.Position == pointerToCheckSum)
+                    {
+                        fs.Position += 4;
+                        continue;
+                    }
+
+                    int nrOfBytesRead = fs.Read(readBuffer, 0, 4);  // Attempt to read next DWORD
+                    if (nrOfBytesRead < 4)
+                    {
+                        // Filesize is not a multiple of 4, ensure we zero out remainder of the buffer for the last read (i.e we zero pad the final DWORD)
+                        for (int i = nrOfBytesRead; i <= 3; i++)
+                            readBuffer[i] = 0;
+                    }
+
+                    currentDWORD =
+                        ((UInt32)readBuffer[0]) |
+                        ((UInt32)readBuffer[1]) << 8 |
+                        ((UInt32)readBuffer[2]) << 16 |
+                        ((UInt32)readBuffer[3]) << 24;
+                    
+                    checkSum += currentDWORD;
+                    // In case of overflow, add the high 32 bits back into the low 32 bits and zero out the highs
+                    if (checkSum > UInt32.MaxValue)
+                    {
+                        checkSum = (checkSum & 0xFFFFFFFF) + (checkSum >> 32);
+                    }
+                }
+
+                // Add high 16 bits back into the low 16 bits
+                checkSum = (checkSum & 0xFFFF) + (checkSum >> 16);
+                // Add high 16 bits again
+                checkSum += (checkSum >> 16);
+                // Discard the high 16 bits
+                checkSum = checkSum & 0xFFFF;
+                // And finally add the data size
+                checkSum = checkSum + (ulong)fileSize;
+            }
+
+            try
+            {
+                File.Delete(tmpFile);
+            }
+            catch (Exception) { }
+
+            return Convert.ToUInt32(checkSum);
         }
 
     }
