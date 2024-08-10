@@ -28,41 +28,61 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 using System;
-using System.Collections.Generic;
 
 namespace LibPENUT
 {
     /// <summary>
-    /// Represents a single page relocation block from a .reloc section
+    /// Represents an single entry in a PE base relocation block
     /// </summary>
-    public class PERelocationBlock
+    public class PEBaseRelocation
     {
 
         /// <summary>
-        /// 
+        /// Creates a new PERelocation object
         /// </summary>
-        public PERelocationBlock()
+        public PEBaseRelocation()
         {
-            Entries = new List<PERelocation>();
+            Type = PERelocationType.IMAGE_REL_BASED_ABSOLUTE;
+            Offset = 0;
         }
 
-        public UInt32 PageRVA
+        public PEBaseRelocation(UInt16 blockEntry)
         {
-            get;set;
+            Offset = (UInt16)(blockEntry & 0x0FFF);
+            Type = (PERelocationType)((blockEntry & 0xF000) >> 12);
+        }
+        
+
+        /// <summary>
+        /// An offset from the starting address that was specified in the Page RVA field for the block. This offset specifies where the base relocation is to be applied.
+        /// </summary>
+        public UInt16 Offset
+        {
+            get; set;
         }
 
         /// <summary>
-        /// The total number of bytes in the base relocation block, including the PageRVA and BlockSize fields and the size of the included entries
+        ///	A value indicating what kind of relocation should be applied.
         /// </summary>
-        public UInt32 BlockSize
+        public PERelocationType Type
         {
-            get { return (UInt32)(8 + Entries.Count * PERelocation.Size); }
+            get; set;
         }
 
-        public IList<PERelocation> Entries
-        { 
-            get;
-            private set;
+        /// <summary>
+        /// The combined values of Type and Offest ORed together in the representation used in the .reloc section
+        /// </summary>
+        public UInt16 EntryValue
+        {
+            get { return (UInt16)(((UInt16)Type << 12) & Offset); }
+        }
+
+        /// <summary>
+        /// The size in bytes of a PERelocation entry
+        /// </summary>
+        public static UInt32 Size
+        {
+            get { return 2; }
         }
 
     }

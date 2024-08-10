@@ -57,6 +57,34 @@ namespace LibPENUT.Test
             }
         }
 
+        [TestMethod]
+        public void TestReadWriteDll()
+        {
+            foreach (string testFile in new string[]
+            {
+                @"TestData\CL_v19\TestData3_Release_Win32.dll",
+                @"TestData\CL_v19\TestData3_Release_x64.dll",
+            })
+            {
+                string testInputDataFile = Path.Combine(TestsRootFolder, testFile);
+                string testOutputDataFile = Path.Combine(TestContext.TestRunResultsDirectory, testFile);
+
+                Directory.CreateDirectory(Path.GetDirectoryName(testOutputDataFile));
+
+                PEImage dll = new PEImage(testInputDataFile);
+
+                dll.Write(testOutputDataFile);
+
+                byte[] originalDll = File.ReadAllBytes(testInputDataFile);
+                byte[] newDll = File.ReadAllBytes(testOutputDataFile);
+
+                PEImage newExeImage = new PEImage(testOutputDataFile);
+
+                Assert.IsTrue(originalDll.SequenceEqual(newDll), string.Format("Unmodified saved .dll file '{0}' does not match original", testOutputDataFile));
+            }
+        }
+
+
 #if NET6_0_OR_GREATER
         /// <summary>
         /// Lazy stresstest, try to parse every .exe/dll in the current program files folders
@@ -223,5 +251,6 @@ namespace LibPENUT.Test
 
             Assert.IsTrue(libPENUTCheckSum == imagehlpCheckSum, "Checksum mismatch - result from CheckSumMappedFile() does not match calculated value");
         }
+
     }
 }

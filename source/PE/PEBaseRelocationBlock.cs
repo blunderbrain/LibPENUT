@@ -28,61 +28,41 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 using System;
+using System.Collections.Generic;
 
 namespace LibPENUT
 {
     /// <summary>
-    /// Represents an single entry in a PE base relocation block
+    /// Represents a single page relocation block from a .reloc section
     /// </summary>
-    public class PERelocation
+    public class PEBaseRelocationBlock
     {
 
         /// <summary>
-        /// Creates a new PERelocation object
+        /// 
         /// </summary>
-        public PERelocation()
+        public PEBaseRelocationBlock()
         {
-            Type = PERelocationType.IMAGE_REL_BASED_ABSOLUTE;
-            Offset = 0;
+            Entries = new List<PEBaseRelocation>();
         }
 
-        public PERelocation(UInt16 blockEntry)
+        public UInt32 PageRVA
         {
-            Offset = (UInt16)(blockEntry & 0x0FFF);
-            Type = (PERelocationType)((blockEntry & 0xF000) >> 12);
-        }
-        
-
-        /// <summary>
-        /// An offset from the starting address that was specified in the Page RVA field for the block. This offset specifies where the base relocation is to be applied.
-        /// </summary>
-        public UInt16 Offset
-        {
-            get; set;
+            get;set;
         }
 
         /// <summary>
-        ///	A value indicating what kind of relocation should be applied.
+        /// The total number of bytes in the base relocation block, including the PageRVA and BlockSize fields and the size of the included entries
         /// </summary>
-        public PERelocationType Type
+        public UInt32 BlockSize
         {
-            get; set;
+            get { return (UInt32)(8 + Entries.Count * PEBaseRelocation.Size); }
         }
 
-        /// <summary>
-        /// The combined values of Type and Offest ORed together in the representation used in the .reloc section
-        /// </summary>
-        public UInt16 EntryValue
-        {
-            get { return (UInt16)(((UInt16)Type << 12) & Offset); }
-        }
-
-        /// <summary>
-        /// The size in bytes of a PERelocation entry
-        /// </summary>
-        public static UInt32 Size
-        {
-            get { return 2; }
+        public IList<PEBaseRelocation> Entries
+        { 
+            get;
+            private set;
         }
 
     }
