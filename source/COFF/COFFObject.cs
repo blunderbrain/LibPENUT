@@ -566,8 +566,9 @@ namespace LibPENUT
             UInt32 nextOffset;
             lock(m_stringTable)
             {
-                // Calculate the byte offset for the new string based on the current last entry in the string table
-                nextOffset = m_stringTable.Count == 0 ? 0 :
+                // Calculate the byte offset for the new string based on the current last entry in the string table.
+                // If the string table is currently empty we start at offest 4 to account for the size field
+                nextOffset = m_stringTable.Count == 0 ? 4 :
                     (UInt32)(m_stringTable.Keys[m_stringTable.Count - 1] + Encoding.ASCII.GetByteCount(m_stringTable.Values[m_stringTable.Count - 1]) + 1);
 
                 m_stringTable.Add(nextOffset, stringData);
